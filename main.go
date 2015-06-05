@@ -3,9 +3,11 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
 	. "github.com/tnantoka/chatsworth"
 	"io/ioutil"
 	"log"
+	"math"
 	"strings"
 	"time"
 )
@@ -50,12 +52,16 @@ func buildMessage(file string) string {
 
 	message := "[info][title]SSL証明書の期限[/title]"
 	for i := 0; i < len(validHosts); i++ {
-		message += <-messageChan
+		m := <-messageChan
+		fmt.Print(m)
+		message += m
 	}
 	message += "[/info]"
 
 	return message
 }
+
+const warningDays = 30
 
 func fetchTimes(hosts []string) <-chan string {
 	messageChan := make(chan string)
@@ -63,8 +69,16 @@ func fetchTimes(hosts []string) <-chan string {
 	jst, _ := time.LoadLocation("Asia/Tokyo")
 	for _, host := range hosts {
 		go func(host string) {
-			time := fetchTime(host).In(jst)
-			messageChan <- host + ": " + time.Format(layout) + "\n"
+			t := fetchTime(host).In(jst)
+			duration := t.Sub(time.Now())
+			days := math.Floor(duration.Hours() / 24)
+			message := host + ": " + t.Format(layout)
+			message += "（あと" + fmt.Sprint(days) + "日）"
+			if days < warningDays {
+				message += " (devil) "
+			}
+			message += "\n"
+			messageChan <- message
 		}(host)
 	}
 
